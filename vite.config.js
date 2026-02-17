@@ -10,7 +10,7 @@ export default defineConfig({
   ],
   server: {
     allowedHosts: [
-      'cope-extra-referred-spirits.trycloudflare.com'
+      'lamps-evaluating-heritage-arrived.trycloudflare.com'
     ]
   }
 })
