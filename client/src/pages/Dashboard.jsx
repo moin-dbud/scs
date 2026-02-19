@@ -1,27 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Bell, User, LogOut, Settings, TrendingUp } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
-    // Course data
-    const courses = [
-        {
-            id: 'ai-cohort-2',
-            title: "2.0 Job Ready AI Powered Cohort",
-            enrolledDate: "Bought on August 20, 2025",
-            progress: 1.97,
-            image: "https://ik.imagekit.io/sheryians/Cohort%202.0/cohort-3_ekZjBiRzc-2_76HU4-Mz5z.jpeg?updatedAt=1757741949621",
-            linkedDiscord: true
-        },
-        {
-            id: 'fullstack-dev',
-            title: "Full Stack Web Development",
-            enrolledDate: "Bought on Sep 1, 2025",
-            progress: 25.5,
-            image: "https://ik.imagekit.io/sheryians/Cohort%202.0/cohort-3_ekZjBiRzc-2_76HU4-Mz5z.jpeg?updatedAt=1757741949621",
-            linkedDiscord: true
-        }
-    ];
+    const { user, getEnrolledCourses } = useAuth();
+    const [enrolledCourses, setEnrolledCourses] = useState([]);
+    const [coursesLoading, setCoursesLoading] = useState(true);
+
+    useEffect(() => {
+        if (!user) { setCoursesLoading(false); return; }
+        getEnrolledCourses()
+            .then(d => { if (d?.enrolledCourses) setEnrolledCourses(d.enrolledCourses); })
+            .catch(() => { })
+            .finally(() => setCoursesLoading(false));
+    }, [user]);
 
     // Generate heatmap data (52 weeks × 7 days = 364 days)
     const generateHeatmap = () => {
@@ -74,7 +67,13 @@ const Dashboard = () => {
     ];
 
     // Calculate overall stats
-    const overallProgress = Math.round(courses.reduce((acc, course) => acc + course.progress, 0) / courses.length);
+    const overallProgress = enrolledCourses.length
+        ? Math.round(enrolledCourses.reduce((acc, c) => acc + c.progress, 0) / enrolledCourses.length)
+        : 0;
+    const hasNoActivity = enrolledCourses.length === 0;
+    // 140 empty heatmap cells (20 cols × 7 rows) for new users
+    const EMPTY_CELLS = Array.from({ length: 140 });
+
 
     return (
         <div className="min-h-screen bg-black">
@@ -117,7 +116,9 @@ const Dashboard = () => {
                             Welcome aboard, <span className="text-blue-500">Moin Sheikh</span> 👋🏻
                         </h2>
                         <p className="text-gray-400 text-sm sm:text-base sm:w-[400px] sm:text-center sm:justify-center sm:mx-auto sm:px-4 sm:py-2">
-                            Continue your learning journey where you left off
+                            {enrolledCourses.length === 0
+                                ? 'Start your learning journey today'
+                                : 'Continue your learning journey where you left off'}
                         </p>
                     </div>
                 </div>
@@ -134,59 +135,80 @@ const Dashboard = () => {
                     </div>
                     <div className='h-full overflow-hidden px-5 md:px-7'>
                         <div className='h-full overflow-y-auto space-y-4 pb-4'>
-                            {courses.map((course) => (
-                                <div key={course.id} className='bg-[#232323] rounded-lg overflow-hidden hover:bg-[#2a2a2a] transition-all duration-300'>
-                                    <div className='flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4'>
-                                        {/* Course Image */}
-                                        <div className='flex-shrink-0 w-full sm:w-40 md:w-48 h-32 sm:h-24 md:h-28 rounded-lg overflow-hidden bg-gray-800'>
-                                            <img
-                                                src={course.image}
-                                                alt={course.title}
-                                                className='w-full h-full object-cover'
-                                            />
+                            {coursesLoading ? (
+                                /* Loading skeleton */
+                                <div className='flex flex-col gap-3 pt-2'>
+                                    {[1, 2].map(i => (
+                                        <div key={i} className='bg-[#232323] rounded-lg p-4 flex gap-4 items-center animate-pulse'>
+                                            <div className='w-40 h-24 rounded-lg bg-[#2a2a2a] flex-shrink-0' />
+                                            <div className='flex-1 space-y-2'>
+                                                <div className='h-4 bg-[#2a2a2a] rounded w-3/4' />
+                                                <div className='h-3 bg-[#2a2a2a] rounded w-1/2' />
+                                                <div className='h-2 bg-[#2a2a2a] rounded w-full mt-3' />
+                                            </div>
                                         </div>
-
-                                        {/* Course Info */}
-                                        <div className='flex-1 min-w-0 w-full sm:w-auto'>
-                                            <h3 className='text-base sm:text-lg md:text-xl font-semibold text-white mb-1'>
-                                                {course.title}
-                                            </h3>
-                                            <p className='text-xs sm:text-sm text-gray-400 mb-3'>
-                                                {course.enrolledDate}
-                                            </p>
-
-                                            {/* Progress Bar */}
-                                            <div className='mb-2'>
-                                                <div className='flex items-center justify-between mb-1'>
-                                                    <span className='text-xs text-gray-400'>Progress {course.progress}%</span>
+                                    ))}
+                                </div>
+                            ) : enrolledCourses.length === 0 ? (
+                                /* ── Empty-state CTA ── */
+                                <div className='flex flex-col items-center justify-center h-full min-h-[300px] text-center gap-4'>
+                                    <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'rgba(60,131,246,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3C83F6" strokeWidth="1.5">
+                                            <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p className='text-white font-bold text-lg mb-1'>No courses enrolled yet</p>
+                                        <p className='text-gray-500 text-sm max-w-[260px] mx-auto'>Pick a course and start building real skills today.</p>
+                                    </div>
+                                    <Link to='/courses'>
+                                        <button className='bg-[#3C83F6] hover:bg-[#2563eb] text-white font-bold px-6 py-2.5 rounded-lg text-sm cursor-pointer transition-colors duration-200 flex items-center gap-2'>
+                                            Browse Courses →
+                                        </button>
+                                    </Link>
+                                </div>
+                            ) : (
+                                enrolledCourses.map((course) => {
+                                    const enrolledLabel = course.enrolledAt
+                                        ? `Enrolled on ${new Date(course.enrolledAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                                        : 'Recently enrolled';
+                                    return (
+                                        <div key={course._id || course.courseId} className='bg-[#232323] rounded-lg overflow-hidden hover:bg-[#2a2a2a] transition-all duration-300'>
+                                            <div className='flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4'>
+                                                <div className='flex-shrink-0 w-full sm:w-40 md:w-48 h-32 sm:h-24 md:h-28 rounded-lg overflow-hidden bg-gray-800'>
+                                                    {course.image
+                                                        ? <img src={course.image} alt={course.title} className='w-full h-full object-cover' />
+                                                        : <div className='w-full h-full bg-[#2a2a2a] flex items-center justify-center text-gray-600 text-xs'>No image</div>
+                                                    }
                                                 </div>
-                                                <div className='w-full bg-gray-700 rounded-full h-1.5 overflow-hidden'>
-                                                    <div
-                                                        className='bg-[#3C83F6] h-full transition-all duration-500'
-                                                        style={{ width: `${course.progress}%` }}
-                                                    ></div>
+                                                <div className='flex-1 min-w-0 w-full sm:w-auto'>
+                                                    <h3 className='text-base sm:text-lg md:text-xl font-semibold text-white mb-1'>{course.title}</h3>
+                                                    <p className='text-xs sm:text-sm text-gray-400 mb-3'>{enrolledLabel}</p>
+                                                    <div className='mb-2'>
+                                                        <div className='flex items-center justify-between mb-1'>
+                                                            <span className='text-xs text-gray-400'>Progress {course.progress || 0}%</span>
+                                                        </div>
+                                                        <div className='w-full bg-gray-700 rounded-full h-1.5 overflow-hidden'>
+                                                            <div className='bg-[#3C83F6] h-full transition-all duration-500' style={{ width: `${course.progress || 0}%` }}></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className='flex flex-row sm:flex-col gap-2 flex-shrink-0 w-full sm:w-auto'>
+                                                    <Link to={`/course/${course.courseId}`} className='flex-1 sm:flex-none'>
+                                                        <button className='w-full bg-[#3C83F6] hover:bg-[#3C83F6]/80 cursor-pointer text-white text-xs sm:text-sm font-semibold px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg transition-colors duration-200 whitespace-nowrap'>Resume Learning</button>
+                                                    </Link>
+                                                    {course.linkedDiscord && (
+                                                        <button className='flex-1 sm:flex-none bg-[#2a2a2a] hover:bg-[#333] cursor-pointer text-white text-xs sm:text-sm font-semibold px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg transition-colors duration-200 whitespace-nowrap border border-gray-700'>Linked with Discord</button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {/* Action Buttons */}
-                                        <div className='flex flex-row sm:flex-col gap-2 flex-shrink-0 w-full sm:w-auto'>
-                                            <Link to={`/course/${course.id}`} className='flex-1 sm:flex-none'>
-                                                <button className='w-full bg-[#3C83F6] hover:bg-[#3C83F6]/80 cursor-pointer text-white text-xs sm:text-sm font-semibold px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg transition-colors duration-200 whitespace-nowrap'>
-                                                    Resume Learning
-                                                </button>
-                                            </Link>
-                                            {course.linkedDiscord && (
-                                                <button className='flex-1 sm:flex-none bg-[#2a2a2a] hover:bg-[#333] cursor-pointer text-white text-xs sm:text-sm font-semibold px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg transition-colors duration-200 whitespace-nowrap border border-gray-700'>
-                                                    Linked with Discord
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+                                    );
+                                })
+                            )}
                         </div>
                     </div>
+
                 </div>
 
                 <div className='w-[35%]  max-lg:h-[45%] hidden sm:flex lg:flex-col gap-5 max-lg:w-full'>
@@ -203,150 +225,15 @@ const Dashboard = () => {
                                 <h1 className="text-2xl mb-3 px-1 tracking">Progress Heatmap</h1>
                             </div>
                             <div className="flex flex-col text-white w-full h-full">
-                                <div className="mb-3 px-1 font-apfel text-primary text-lg flex items-center justify-between">Crushed 49 activities so far!</div>
-                                <div className="grid gap-1 w-full select-none border p-3 rounded-lg border-white/20" style={{ gridTemplateRows: 'repeat(7, minmax(0px, 1fr))', gridTemplateColumns: 'repeat(20, minmax(0px, 1fr))' }}>
-                                    <div className="relative rounded-sm w-full aspect-square transition-colors duration-300 bg-[#3C83F6]" data-tip="20 activities on February 7, 2026"></div>
-                                    <div className="relative rounded-sm w-full aspect-square transition-colors duration-300 bg-[#3C83F6]" data-tip="19 activities on February 14, 2026"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square transition-colors duration-300 bg-[#2a2a2a]" data-tip="0 activities on February 8, 2026"></div>
-                                    <div className="relative rounded-sm w-full aspect-square transition-colors duration-300 bg-[#2a2a2a]" data-tip="0 activities on February 15, 2026"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square transition-colors duration-300 bg-[#2a2a2a]" data-tip="0 activities on February 9, 2026"></div>
-                                    <div className="relative rounded-sm w-full aspect-square transition-colors duration-300 bg-[#8FB8FA]" data-tip="9 activities on February 16, 2026"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square transition-colors duration-300 bg-[#2a2a2a]" data-tip="0 activities on February 10, 2026"></div>
-                                    <div className="relative rounded-sm w-full aspect-square transition-colors duration-300 bg-[#8FB8FA]" data-tip="1 activity on February 17, 2026"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square transition-colors duration-300 bg-[#2a2a2a]" data-tip="0 activities on February 11, 2026"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square transition-colors duration-300 bg-[#2a2a2a]" data-tip="0 activities on February 12, 2026"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square transition-colors duration-300 bg-[#2a2a2a]" data-tip="0 activities on February 13, 2026"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
-                                    <div className="relative rounded-sm w-full aspect-square bg-[#757575] transition-colors duration-300"></div>
+                                <div className="mb-3 px-1 font-apfel text-primary text-md flex items-center justify-between">
+                                    {hasNoActivity ? '0 activities so far — start learning!' : 'Crushed 49 activities so far!'}
                                 </div>
-                                <div className="mt-4 text-gray-400 flex items-start justify-between gap-5 px-1"><div>Learn how we count activities</div>
+                                <div className="grid gap-1 w-full select-none border p-3 rounded-lg border-white/20" style={{ gridTemplateRows: 'repeat(7, minmax(0px, 1fr))', gridTemplateColumns: 'repeat(20, minmax(0px, 1fr))' }}>
+                                    {EMPTY_CELLS.map((_, i) => (
+                                        <div key={i} className="relative rounded-sm w-full aspect-square bg-[#2a2a2a] transition-colors duration-300" />
+                                    ))}
+                                </div>
+                                <div className="mt-4 text-gray-400 flex items-start justify-between gap-5 px-1"><div className='text-sm'>Learn how we count activities</div>
                                     <div className="flex gap-3">Less<div className="flex gap-1.5"><div className="relative rounded-md w-6 aspect-square bg-[#2a2a2a]"></div><div className="relative rounded-md w-6 aspect-square bg-[#BBD4FC]"></div><div className="relative rounded-md w-6 aspect-square bg-[#8FB8FA]"></div><div className="relative rounded-md w-6 aspect-square bg-[#639CF8]"></div><div className="relative rounded-md w-6 aspect-square bg-[#0B64F4]"></div></div>More</div></div></div></div></div>
                 </div>
             </div>

@@ -1,66 +1,78 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
+export const API = 'http://localhost:5000/api/auth';
 
-const API = 'http://localhost:5000/api/auth';
+/* ── tiny fetch helper ── */
+const apiFetch = async (path, method = 'GET', body = null) => {
+    const token = localStorage.getItem('token');
+    const opts = {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+    };
+    const res = await fetch(`${API}${path}`, opts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Request failed');
+    return data;
+};
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);  // checking existing session
+    const [loading, setLoading] = useState(true);
 
-    /* ── Restore session on mount ── */
+    /* Restore session */
     useEffect(() => {
         const token = localStorage.getItem('token');
         if (!token) { setLoading(false); return; }
-
-        fetch(`${API}/me`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.ok ? r.json() : null)
-            .then(data => { if (data?.user) setUser(data.user); })
-            .catch(() => { })
+        apiFetch('/me')
+            .then(d => { if (d?.user) setUser(d.user); })
+            .catch(() => localStorage.removeItem('token'))
             .finally(() => setLoading(false));
     }, []);
 
     /* ── Register ── */
-    const register = async ({ firstName, lastName, email, password }) => {
-        const res = await fetch(`${API}/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ firstName, lastName, email, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Registration failed');
+    const register = async (fields) => {
+        const data = await apiFetch('/register', 'POST', fields);
         localStorage.setItem('token', data.token);
         setUser(data.user);
         return data.user;
     };
 
     /* ── Login ── */
-    const login = async ({ email, password }) => {
-        const res = await fetch(`${API}/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Login failed');
+    const login = async (fields) => {
+        const data = await apiFetch('/login', 'POST', fields);
         localStorage.setItem('token', data.token);
         setUser(data.user);
         return data.user;
     };
 
-    /* ── Update Profile ── */
-    const updateProfile = async (fields) => {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API}/profile`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify(fields),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Update failed');
+    /* ── Update Basic Profile ── */
+    const updateBasicProfile = async (fields) => {
+        const data = await apiFetch('/profile/basic', 'PUT', fields);
         setUser(data.user);
         return data.user;
     };
+
+    /* ── Update Professional Profile ── */
+    const updateProfessionalProfile = async (fields) => {
+        const data = await apiFetch('/profile/professional', 'PUT', fields);
+        setUser(data.user);
+        return data.user;
+    };
+
+    /* ── Projects ── */
+    const getProjects = () => apiFetch('/projects');
+    const submitProject = (fields) => apiFetch('/projects', 'POST', fields);
+    const deleteProject = (id) => apiFetch(`/projects/${id}`, 'DELETE');
+
+    /* ── Enrolled Courses ── */
+    const getEnrolledCourses = () => apiFetch('/enrolled');
+    const enrollCourse = (courseId, title, image) =>
+        apiFetch('/enroll', 'POST', { courseId, title, image });
 
     /* ── Logout ── */
     const logout = () => {
@@ -69,7 +81,13 @@ export function AuthProvider({ children }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, register, login, updateProfile, logout }}>
+        <AuthContext.Provider value={{
+            user, loading,
+            register, login, logout,
+            updateBasicProfile, updateProfessionalProfile,
+            getProjects, submitProject, deleteProject,
+            getEnrolledCourses, enrollCourse,
+        }}>
             {children}
         </AuthContext.Provider>
     );

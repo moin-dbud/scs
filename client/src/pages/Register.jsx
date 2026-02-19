@@ -33,7 +33,7 @@ export default function Register() {
         setLoading(true);
         try {
             await register({ firstName: form.firstName, lastName: form.lastName, email: form.email, password: form.password });
-            navigate('/dashboard');
+            navigate('/courses');
         } catch (err) {
             setError(err.message);
         } finally {

@@ -11,6 +11,7 @@ import Task from '../pages/Task';
 import Profile from '../pages/Profile';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
+import Courses from '../pages/Courses';
 import NotFound from '../pages/NotFound';
 
 /**
@@ -43,9 +44,10 @@ const AppRoutes = () => {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
 
-            {/* Protected Routes (no authentication logic yet) */}
+            {/* Protected Routes */}
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/courses" element={<Courses />} />
 
             {/* Dynamic Routes */}
             <Route path="/course/:id" element={<Course />} />
