@@ -6,18 +6,12 @@ const transporter = nodemailer.createTransport({
     port: 465,
     secure: true,
     auth: {
-        user: 'levelup.dev@moinsheikh.in',
-        pass: 'Aa4FuBkxb9cf'
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
     }
 });
 
-/**
- * Send an email if the specific notification setting is enabled
- * @param {string} to - Recipient email
- * @param {string} subject - Email subject
- * @param {string} html - HTML content
- * @param {string} settingKey - Key in settings to check (e.g., 'notifyNewUser')
- */
+
 const sendMail = async (to, subject, html, settingKey) => {
     try {
         // Fetch settings
