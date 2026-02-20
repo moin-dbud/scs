@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema({
     dob: { type: String, default: '' },
     bio: { type: String, default: '' },
     role: { type: String, default: 'STUDENT' },
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
 
     /* ── Professional ── */
     designation: { type: String, default: '' },
@@ -31,6 +32,7 @@ const userSchema = new mongoose.Schema({
         enrolledAt: { type: Date, default: Date.now },
         progress: { type: Number, default: 0 },
         linkedDiscord: { type: Boolean, default: false },
+        completedLessons: { type: [String], default: [] },   // stores lesson ObjectId strings
     }],
 }, { timestamps: true });
 

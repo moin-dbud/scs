@@ -3,6 +3,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Project = require('../models/Project');
+const CourseModule = require('../models/CourseModule');
+const { sendMail } = require('../utils/email');
+const { welcomeTemplate, enrollmentTemplate, submissionTemplate } = require('../utils/emailTemplates');
 
 const router = express.Router();
 
@@ -40,6 +43,14 @@ router.post('/register', async (req, res) => {
         const hashed = await bcrypt.hash(password, 12);
         const user = await User.create({ firstName, lastName, email, password: hashed });
         const token = signToken(user._id);
+
+        // Send Welcome Email
+        sendMail(
+            email,
+            'Welcome to LevelUp.dev! 🚀',
+            welcomeTemplate(firstName),
+            'notifyNewUser'
+        );
 
         res.status(201).json({ token, user: sanitize(user) });
     } catch (err) {
@@ -150,9 +161,95 @@ router.post('/enroll', authMiddleware, async (req, res) => {
         user.enrolledCourses.push({ courseId, title, image, enrolledAt: new Date(), progress: 0 });
         await user.save();
 
+        // Send Enrollment Email
+        sendMail(
+            user.email,
+            `Enrollment Confirmed: ${title} ✅`,
+            enrollmentTemplate(title),
+            'notifyEnrollment'
+        );
+
         res.status(201).json({ enrolledCourses: user.enrolledCourses });
     } catch (err) {
         console.error('Enroll error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+/* GET /api/auth/lesson-progress/:courseId — get completed lesson IDs for user */
+router.get('/lesson-progress/:courseId', authMiddleware, async (req, res) => {
+    try {
+        const courseId = req.params.courseId;
+        const user = await User.findById(req.userId).select('enrolledCourses');
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const enroll = user.enrolledCourses.find(
+            e => String(e.courseId) === String(courseId)
+        );
+        if (!enroll) return res.json({ completedLessons: [], progress: 0 });
+
+        /* Gather every lesson _id that currently exists for this course */
+        const modules = await CourseModule.find({ courseId }).select('lessons._id');
+        const validIds = new Set(
+            modules.flatMap(m => m.lessons.map(l => String(l._id)))
+        );
+        const totalLessons = validIds.size;
+
+        /* Prune stale lesson IDs that no longer exist */
+        const before = enroll.completedLessons.length;
+        enroll.completedLessons = enroll.completedLessons.filter(id => validIds.has(String(id)));
+
+        /* Recalculate progress */
+        const newProgress = totalLessons > 0
+            ? Math.round((enroll.completedLessons.length / totalLessons) * 100)
+            : 0;
+
+        /* If anything changed, persist the fix */
+        if (enroll.completedLessons.length !== before || enroll.progress !== newProgress) {
+            enroll.progress = newProgress;
+            await user.save();
+        }
+
+        res.json({
+            completedLessons: enroll.completedLessons,
+            progress: enroll.progress,
+        });
+    } catch (err) {
+        console.error('lesson-progress error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+/* POST /api/auth/complete-lesson — mark a lesson done & recalculate progress */
+router.post('/complete-lesson', authMiddleware, async (req, res) => {
+    try {
+        const { courseId, lessonId, totalLessons } = req.body;
+        if (!courseId || !lessonId) return res.status(400).json({ message: 'courseId and lessonId required' });
+
+        const user = await User.findById(req.userId);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const enroll = user.enrolledCourses.find(
+            e => String(e.courseId) === String(courseId)
+        );
+        if (!enroll) return res.status(404).json({ message: 'Not enrolled in this course' });
+
+        /* idempotent — don't double-add */
+        if (!enroll.completedLessons.includes(String(lessonId))) {
+            enroll.completedLessons.push(String(lessonId));
+        }
+
+        /* recalculate progress % */
+        const total = Number(totalLessons) || 1;
+        enroll.progress = Math.round((enroll.completedLessons.length / total) * 100);
+
+        await user.save();
+        res.json({
+            completedLessons: enroll.completedLessons,
+            progress: enroll.progress,
+        });
+    } catch (err) {
+        console.error('complete-lesson error:', err);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -185,6 +282,18 @@ router.post('/projects', authMiddleware, async (req, res) => {
         const project = await Project.create({
             userId: req.userId, title, description, techStack: techArray, githubUrl, liveUrl,
         });
+
+        // Send Project Submission Email
+        const user = await User.findById(req.userId);
+        if (user) {
+            sendMail(
+                user.email,
+                `Project Submitted: ${title} 📬`,
+                submissionTemplate(title),
+                'notifyProject'
+            );
+        }
+
         res.status(201).json({ project });
     } catch (err) {
         console.error('Project create error:', err);

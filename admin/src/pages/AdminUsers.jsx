@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Search, Filter, MoreHorizontal, UserCheck, UserX, Mail } from 'lucide-react';
+import { Search, Filter, UserCheck, UserX, Mail } from 'lucide-react';
+import { usePlatform } from '../context/PlatformStore';
 
 const C = {
     accent: '#ef4444', blue: '#3b82f6', green: '#22c55e', yellow: '#f59e0b',
@@ -7,19 +8,11 @@ const C = {
     border: 'rgba(255,255,255,0.08)', borderS: 'rgba(255,255,255,0.05)',
 };
 
-const USERS = [
-    { id: 1, name: 'Moin Sheikh', email: 'moinsheikh6646@gmail.com', role: 'admin', courses: 1, joined: '19 Feb 2026', status: 'active' },
-    { id: 2, name: 'Arjun Mehta', email: 'arjun.m@example.com', role: 'student', courses: 2, joined: '18 Feb 2026', status: 'active' },
-    { id: 3, name: 'Priya Sharma', email: 'priya.s@example.com', role: 'student', courses: 3, joined: '17 Feb 2026', status: 'active' },
-    { id: 4, name: 'Rohit Verma', email: 'rohit.v@example.com', role: 'student', courses: 1, joined: '16 Feb 2026', status: 'inactive' },
-    { id: 5, name: 'Sneha Patil', email: 'sneha.p@example.com', role: 'student', courses: 2, joined: '15 Feb 2026', status: 'active' },
-    { id: 6, name: 'Dev Kumar', email: 'dev.k@example.com', role: 'student', courses: 0, joined: '14 Feb 2026', status: 'active' },
-    { id: 7, name: 'Neha Joshi', email: 'neha.j@example.com', role: 'student', courses: 1, joined: '13 Feb 2026', status: 'inactive' },
-];
-
 export default function AdminUsers() {
+    const { users, usersLoading, usersError, toggleUserStatus } = usePlatform();
     const [search, setSearch] = useState('');
-    const filtered = USERS.filter(u =>
+
+    const filtered = users.filter(u =>
         u.name.toLowerCase().includes(search.toLowerCase()) ||
         u.email.toLowerCase().includes(search.toLowerCase())
     );
@@ -60,37 +53,82 @@ export default function AdminUsers() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((u) => (
-                                <tr key={u.id} style={{ borderBottom: `1px solid ${C.borderS}` }}
+                            {usersLoading ? (
+                                <tr><td colSpan={7} style={{ padding: '30px 20px', textAlign: 'center', color: C.dim, fontSize: '13px' }}>Loading users from server…</td></tr>
+                            ) : usersError ? (
+                                <tr><td colSpan={7} style={{ padding: '30px 20px', textAlign: 'center', color: C.accent, fontSize: '13px' }}>{usersError}</td></tr>
+                            ) : filtered.length === 0 ? (
+                                <tr><td colSpan={7} style={{ padding: '30px 20px', textAlign: 'center', color: C.dim, fontSize: '13px' }}>No users found.</td></tr>
+                            ) : filtered.map(u => (
+                                <tr key={u._id}
+                                    style={{ borderBottom: `1px solid ${C.borderS}` }}
                                     onMouseEnter={e => e.currentTarget.style.background = '#161616'}
                                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                 >
                                     <td style={{ padding: '13px 20px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                             <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: 'linear-gradient(135deg,#3b82f6,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '12px', flexShrink: 0 }}>
-                                                {u.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+                                                {(u.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2)}
                                             </div>
                                             <span style={{ fontWeight: 600 }}>{u.name}</span>
                                         </div>
                                     </td>
                                     <td style={{ padding: '13px 20px', color: C.muted }}>{u.email}</td>
                                     <td style={{ padding: '13px 20px' }}>
-                                        <span style={{ background: u.role === 'admin' ? 'rgba(239,68,68,0.12)' : 'rgba(59,130,246,0.12)', color: u.role === 'admin' ? C.accent : C.blue, borderRadius: '20px', padding: '2px 10px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
+                                        <span style={{ background: u.role === 'ADMIN' ? 'rgba(239,68,68,0.12)' : 'rgba(59,130,246,0.12)', color: u.role === 'ADMIN' ? C.accent : C.blue, borderRadius: '20px', padding: '2px 10px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>
                                             {u.role}
                                         </span>
                                     </td>
-                                    <td style={{ padding: '13px 20px', fontWeight: 600 }}>{u.courses}</td>
-                                    <td style={{ padding: '13px 20px', color: C.muted }}>{u.joined}</td>
+                                    <td style={{ padding: '13px 20px', fontWeight: 600 }}>{u.enrolledCount ?? 0}</td>
+                                    <td style={{ padding: '13px 20px', color: C.muted }}>
+                                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                                    </td>
                                     <td style={{ padding: '13px 20px' }}>
-                                        <span style={{ background: u.status === 'active' ? 'rgba(34,197,94,0.12)' : 'rgba(85,85,85,0.2)', color: u.status === 'active' ? C.green : C.dim, borderRadius: '20px', padding: '3px 10px', fontWeight: 600, fontSize: '11px' }}>
-                                            {u.status}
+                                        <span style={{ background: (u.status || 'active') === 'active' ? 'rgba(34,197,94,0.12)' : 'rgba(85,85,85,0.2)', color: (u.status || 'active') === 'active' ? C.green : C.dim, borderRadius: '20px', padding: '3px 10px', fontWeight: 600, fontSize: '11px' }}>
+                                            {u.status || 'active'}
                                         </span>
                                     </td>
                                     <td style={{ padding: '13px 20px' }}>
-                                        <div style={{ display: 'flex', gap: '6px' }}>
-                                            <button title="Send email" style={{ padding: '6px', background: 'transparent', border: `1px solid ${C.borderS}`, borderRadius: '7px', color: C.dim, cursor: 'pointer', display: 'flex' }}><Mail size={13} /></button>
-                                            <button title="Activate / Deactivate" style={{ padding: '6px', background: 'transparent', border: `1px solid ${C.borderS}`, borderRadius: '7px', color: u.status === 'active' ? C.yellow : C.green, cursor: 'pointer', display: 'flex' }}>
-                                                {u.status === 'active' ? <UserX size={13} /> : <UserCheck size={13} />}
+                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                            {/* ── Mail button: opens system email client directly ── */}
+                                            <a
+                                                href={`mailto:${u.email}?subject=${encodeURIComponent('LevelUp.dev — Message from Admin')}&body=${encodeURIComponent(`Hi ${u.name},\n\n`)}`}
+                                                title={`Email ${u.name} (${u.email})`}
+                                                style={{
+                                                    padding: '6px', background: 'transparent',
+                                                    border: `1px solid ${C.borderS}`, borderRadius: '7px',
+                                                    color: C.blue, cursor: 'pointer', display: 'flex',
+                                                    textDecoration: 'none', transition: 'all 0.15s',
+                                                }}
+                                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; e.currentTarget.style.borderColor = C.blue; }}
+                                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = C.borderS; }}
+                                            >
+                                                <Mail size={13} />
+                                            </a>
+
+                                            {/* ── Activate / Deactivate button ── */}
+                                            <button
+                                                title={(u.status || 'active') === 'active' ? `Deactivate ${u.name}` : `Reactivate ${u.name}`}
+                                                onClick={() => toggleUserStatus(u._id, u.status || 'active')}
+                                                style={{
+                                                    padding: '6px 10px', background: 'transparent',
+                                                    border: `1px solid ${C.borderS}`, borderRadius: '7px',
+                                                    color: (u.status || 'active') === 'active' ? C.yellow : C.green,
+                                                    cursor: 'pointer', display: 'flex', alignItems: 'center',
+                                                    gap: '4px', fontSize: '11px', fontFamily: 'inherit',
+                                                    transition: 'all 0.15s',
+                                                }}
+                                                onMouseEnter={e => {
+                                                    const isActive = (u.status || 'active') === 'active';
+                                                    e.currentTarget.style.background = isActive ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.1)';
+                                                    e.currentTarget.style.borderColor = isActive ? C.yellow : C.green;
+                                                }}
+                                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = C.borderS; }}
+                                            >
+                                                {(u.status || 'active') === 'active'
+                                                    ? <><UserX size={12} /> Deactivate</>
+                                                    : <><UserCheck size={12} /> Activate</>
+                                                }
                                             </button>
                                         </div>
                                     </td>
@@ -100,7 +138,7 @@ export default function AdminUsers() {
                     </table>
                 </div>
                 <div style={{ padding: '12px 20px', borderTop: `1px solid ${C.borderS}`, fontSize: '12px', color: C.dim }}>
-                    Showing {filtered.length} of {USERS.length} users
+                    Showing {filtered.length} of {users.length} users
                 </div>
             </div>
         </div>

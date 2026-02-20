@@ -9,13 +9,33 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-/* ── Design tokens ── */
+/* ── Design tokens (same as Dashboard) ── */
 const C = {
-    bg: '#000', nav: '#171717', surface: '#171717', card: '#232323',
-    raised: '#2a2a2a', border: 'rgba(255,255,255,0.12)', borderS: 'rgba(255,255,255,0.06)',
-    accent: '#3C83F6', grad: 'linear-gradient(135deg,#3b82f6,#7c3aed)',
-    text: '#fff', muted: '#a1a1aa', dim: '#555',
+    bg: '#0a0a0a',
+    nav: '#0f0f0f',
+    surface: '#141414',
+    card: '#141414',
+    raised: '#1a1a1a',
+    border: 'rgba(255,255,255,0.07)',
+    borderS: 'rgba(255,255,255,0.07)',
+    accent: '#3C83F6',
+    grad: 'linear-gradient(135deg,#3b82f6,#7c3aed)',
+    text: '#fff',
+    muted: '#a1a1aa',
+    dim: '#555',
 };
+
+const globalCss = `
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');
+@keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+@keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:0.4} }
+* { box-sizing: border-box; }
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:#2a2a2a; border-radius:4px; }
+.nav-link-p:hover { color:#fff !important; }
+.side-btn:hover   { background: #1e1e1e !important; }
+`;
 
 const SECTIONS = [
     { id: 'basic', label: 'Basic Info', sub: 'Personal details', Icon: User },
@@ -94,8 +114,15 @@ export default function Profile() {
     useEffect(() => {
         if (activeSection !== 'batches') return;
         setBatchesLoading(true);
-        getEnrolledCourses()
-            .then(d => setEnrolledCourses(d.enrolledCourses || []))
+        Promise.all([
+            getEnrolledCourses(),
+            fetch('http://localhost:5000/api/admin/courses/public').then(r => r.json()),
+        ])
+            .then(([enrolled, catalog]) => {
+                const all = enrolled?.enrolledCourses || [];
+                const liveIds = new Set((catalog?.courses || []).map(c => c._id));
+                setEnrolledCourses(all.filter(c => liveIds.has(c.courseId)));
+            })
             .catch(() => { })
             .finally(() => setBatchesLoading(false));
     }, [activeSection]);
@@ -140,123 +167,133 @@ export default function Profile() {
     const initials = `${basicForm.firstName[0] || ''}${basicForm.lastName[0] || ''}`.toUpperCase() || 'U';
 
     return (
-        <div style={{ minHeight: '100vh', background: C.bg, fontFamily: 'outfit, outfit Fallback, Arial, sans-serif', color: C.text }}>
-            {/* Dark select option styling */}
-            <style>{`
+        <div style={{ minHeight: '100vh', background: C.bg, fontFamily: 'Outfit, Arial, sans-serif', color: C.text }}>
+            <style>{globalCss + `
                 select option { background: #1a1a1a; color: #fff; }
                 select option:disabled { color: #555; }
-                select option:checked, select option:hover { background: #3C83F6 !important; color: #fff; }
+                select option:checked { background: #3C83F6 !important; color: #fff; }
             `}</style>
 
-            {/* ══ NAVBAR ══ */}
+            {/* ══ NAVBAR — matches Dashboard ══ */}
             <nav style={{ background: C.nav, borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, zIndex: 50 }}>
-                <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '65px' }}>
+                <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '0 24px', height: '58px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    {/* Logo */}
                     <Link to="/" style={{ textDecoration: 'none' }}>
-                        <h1 style={{ fontSize: '22px', fontWeight: 900, color: C.text, margin: 0 }}>
-                            LevelUp<span style={{ color: C.accent }}>.dev</span>
-                        </h1>
+                        <span style={{ fontWeight: 900, fontSize: '20px', color: C.text }}>LevelUp<span style={{ color: C.accent }}>.dev</span></span>
                     </Link>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontWeight: 700, fontSize: '16px' }}>{basicForm.firstName} {basicForm.lastName}</span>
-                        <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: C.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '15px' }}>
+
+                    {/* Nav links */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {[['/', 'Home'], ['/courses', 'Courses'], ['/dashboard', 'Dashboard']].map(([to, label]) => (
+                            <Link key={to} to={to} className="nav-link-p"
+                                style={{ padding: '7px 13px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: C.muted, textDecoration: 'none', transition: 'color 0.15s' }}>
+                                {label}
+                            </Link>
+                        ))}
+                    </div>
+
+                    {/* Right: name + avatar + logout */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ textAlign: 'right' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 700, display: 'block', lineHeight: 1.2 }}>{basicForm.firstName} {basicForm.lastName}</span>
+                            <span style={{ fontSize: '11px', color: C.muted }}>My Profile</span>
+                        </div>
+                        <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: C.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '13px' }}>
                             {initials}
                         </div>
-                        <ChevronDown size={16} color={C.muted} />
+                        <button onClick={() => { logout(); navigate('/login'); }} title="Sign out"
+                            style={{ width: '34px', height: '34px', borderRadius: '8px', background: 'transparent', border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: C.dim }}>
+                            <LogOut size={14} />
+                        </button>
                     </div>
                 </div>
             </nav>
 
-            {/* ══ GLOBAL FEEDBACK ══ */}
+            {/* ══ GLOBAL FEEDBACK TOAST ══ */}
             {feedback.msg && (
                 <div style={{
-                    position: 'fixed', top: '76px', right: '24px', zIndex: 100,
-                    background: feedback.type === 'error' ? 'rgba(239,68,68,0.95)' : 'rgba(60,131,246,0.95)',
-                    color: '#fff', padding: '12px 20px', borderRadius: '10px',
-                    fontSize: '13px', fontWeight: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                    position: 'fixed', top: '68px', right: '20px', zIndex: 200,
+                    background: feedback.type === 'error' ? '#ef4444' : C.accent,
+                    color: '#fff', padding: '11px 18px', borderRadius: '10px',
+                    fontSize: '13px', fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                    animation: 'fadeUp 0.25s ease',
                 }}>
                     {feedback.msg}
                 </div>
             )}
 
             {/* ══ BODY ══ */}
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 24px', display: 'grid', gridTemplateColumns: '240px 1fr', gap: '20px', alignItems: 'start' }}>
+            <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '28px 24px', display: 'grid', gridTemplateColumns: '240px 1fr', gap: '20px', alignItems: 'start', animation: 'fadeUp 0.35s ease' }}>
 
                 {/* ──────── SIDEBAR ──────── */}
-                <aside style={{ background: C.surface, borderRadius: '16px', border: `1px solid ${C.borderS}`, overflow: 'hidden' }}>
-                    <div style={{ padding: '22px 20px 14px' }}>
-                        <p style={{ fontWeight: 700, fontSize: '16px', marginBottom: '4px' }}>My Profile</p>
-                        <p style={{ fontSize: '12px', color: C.muted, lineHeight: 1.5 }}>Manage your information and preferences</p>
-                    </div>
-
-                    {/* Avatar */}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px 20px 20px' }}>
-                        <div style={{ width: '76px', height: '76px', borderRadius: '50%', background: C.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 800, marginBottom: '12px', boxShadow: '0 0 24px rgba(60,131,246,0.25)' }}>
+                <aside style={{ background: C.surface, borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden', position: 'sticky', top: '70px' }}>
+                    {/* Avatar hero */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '28px 20px 18px', borderBottom: `1px solid ${C.border}` }}>
+                        <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: C.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 800, marginBottom: '12px', boxShadow: '0 0 0 4px rgba(60,131,246,0.12), 0 0 20px rgba(60,131,246,0.18)' }}>
                             {initials}
                         </div>
-                        <p style={{ fontWeight: 700, fontSize: '15px', marginBottom: '8px' }}>{basicForm.firstName} {basicForm.lastName}</p>
-                        <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.8px', background: 'rgba(60,131,246,0.15)', color: C.accent, border: `1px solid rgba(60,131,246,0.35)`, borderRadius: '20px', padding: '3px 12px' }}>
-                            {profForm.designation || 'Select Profession'}
+                        <p style={{ fontWeight: 800, fontSize: '14px', marginBottom: '5px', textAlign: 'center' }}>{basicForm.firstName} {basicForm.lastName}</p>
+                        <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', background: 'rgba(60,131,246,0.12)', color: C.accent, border: `1px solid rgba(60,131,246,0.25)`, borderRadius: '20px', padding: '3px 11px' }}>
+                            {profForm.designation || 'Set Profession'}
                         </span>
                         {profForm.company && (
-                            <p style={{ alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: C.dim }}>{profForm.company}</p>
+                            <p style={{ fontSize: '12px', color: C.dim, marginTop: '5px', textAlign: 'center' }}>{profForm.company}</p>
                         )}
                     </div>
 
+                    {/* Quick stats */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `1px solid ${C.border}` }}>
+                        {[['Courses', enrolledCourses.length], ['Projects', projects.length]].map(([label, val], i) => (
+                            <div key={label} style={{ padding: '14px 10px', textAlign: 'center', borderRight: i === 0 ? `1px solid ${C.border}` : 'none' }}>
+                                <p style={{ fontSize: '20px', fontWeight: 900, color: C.accent, margin: '0 0 2px' }}>{val}</p>
+                                <p style={{ fontSize: '11px', color: C.dim, margin: 0 }}>{label}</p>
+                            </div>
+                        ))}
+                    </div>
+
                     {/* Nav */}
-                    <div style={{ padding: '0 10px 12px' }}>
+                    <div style={{ padding: '10px' }}>
                         {SECTIONS.map(({ id, label, sub, Icon }) => {
                             const active = activeSection === id;
                             return (
-                                <button key={id} onClick={() => setActiveSection(id)} style={{
-                                    width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '11px',
-                                    padding: '10px 13px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-                                    background: active ? C.accent : 'transparent',
-                                    color: active ? '#fff' : C.muted, marginBottom: '3px',
-                                    transition: 'all 0.18s', fontFamily: 'inherit',
-                                }}
-                                    onMouseEnter={e => { if (!active) e.currentTarget.style.background = C.card; }}
-                                    onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-                                >
-                                    <div style={{ width: '30px', height: '30px', borderRadius: '8px', flexShrink: 0, background: active ? 'rgba(255,255,255,0.20)' : C.card, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <Icon size={14} />
+                                <button key={id} onClick={() => setActiveSection(id)} className="side-btn" style={{
+                                    width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px',
+                                    padding: '9px 11px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                                    background: active ? 'rgba(60,131,246,0.12)' : 'transparent',
+                                    color: active ? C.accent : C.muted, marginBottom: '2px',
+                                    transition: 'all 0.15s', fontFamily: 'inherit',
+                                    borderLeft: active ? `3px solid ${C.accent}` : '3px solid transparent',
+                                }}>
+                                    <div style={{ width: '28px', height: '28px', borderRadius: '7px', flexShrink: 0, background: active ? 'rgba(60,131,246,0.15)' : C.raised, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Icon size={13} color={active ? C.accent : C.dim} />
                                     </div>
                                     <div>
-                                        <p style={{ fontWeight: 600, fontSize: '13px', marginBottom: '1px' }}>{label}</p>
-                                        <p style={{ fontSize: '11px', opacity: 0.7 }}>{sub}</p>
+                                        <p style={{ fontWeight: 700, fontSize: '13px', marginBottom: '1px', color: active ? C.accent : C.text }}>{label}</p>
+                                        <p style={{ fontSize: '11px', color: C.dim }}>{sub}</p>
                                     </div>
                                 </button>
                             );
                         })}
                     </div>
 
-                    {/* Quick stats */}
-                    <div style={{ margin: '0 10px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr', border: `1px solid ${C.borderS}`, borderRadius: '10px', overflow: 'hidden' }}>
-                        {[['Courses', enrolledCourses.length], ['Projects', projects.length]].map(([label, val], i) => (
-                            <div key={label} style={{ padding: '14px 10px', textAlign: 'center', borderRight: i === 0 ? `1px solid ${C.borderS}` : 'none' }}>
-                                <p style={{ fontSize: '20px', fontWeight: 800, color: C.accent }}>{val}</p>
-                                <p style={{ fontSize: '11px', color: C.dim }}>{label}</p>
-                            </div>
-                        ))}
-                    </div>
-
                     {/* Logout */}
-                    <div style={{ padding: '0 10px 14px' }}>
+                    <div style={{ padding: '6px 10px 12px' }}>
                         <button onClick={() => { logout(); navigate('/login'); }} style={{
                             width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                            padding: '10px', borderRadius: '10px', border: `1px solid rgba(248,113,113,0.3)`,
-                            background: 'transparent', color: '#f87171', fontSize: '13px', fontWeight: 600,
-                            cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.18s',
+                            padding: '9px', borderRadius: '10px', border: `1px solid rgba(239,68,68,0.2)`,
+                            background: 'transparent', color: '#f87171', fontSize: '12px', fontWeight: 600,
+                            cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s',
                         }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248,113,113,0.08)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.07)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
-                            <LogOut size={14} /> Log Out
+                            <LogOut size={13} /> Sign Out
                         </button>
                     </div>
                 </aside>
 
                 {/* ──────── MAIN CONTENT ──────── */}
-                <main style={{ background: C.surface, borderRadius: '16px', border: `1px solid ${C.borderS}`, overflow: 'hidden', minHeight: '500px' }}>
+                <main style={{ background: C.surface, borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden', minHeight: '500px' }}>
 
                     {/* ═══ BASIC INFO ═══ */}
                     {activeSection === 'basic' && (
@@ -778,7 +815,7 @@ function EmptyState({ icon, title, sub }) {
 }
 
 function Loader() {
-    return <div style={{ minHeight: '100vh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'outfit, Arial, sans-serif' }}>Loading…</div>;
+    return <div style={{ minHeight: '100vh', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Outfit, Arial, sans-serif', fontSize: '14px', color: '#555' }}>Loading…</div>;
 }
 
-const lbl = { display: 'block', fontSize: '12px', color: '#888', marginBottom: '7px', fontWeight: 500 };
+const lbl = { display: 'block', fontSize: '12px', color: '#666', marginBottom: '7px', fontWeight: 600, letterSpacing: '0.3px' };

@@ -14,67 +14,15 @@ const C = {
     text: '#fff', muted: '#a1a1aa', dim: '#555',
 };
 
-/* ── Course catalog ── */
-const CATALOG = [
-    {
-        id: 'ai-cohort-2',
-        title: '2.0 Job Ready AI Powered Cohort',
-        subtitle: 'Master AI & modern full-stack development with hands-on projects',
-        image: 'https://ik.imagekit.io/sheryians/Cohort%202.0/cohort-3_ekZjBiRzc-2_76HU4-Mz5z.jpeg?updatedAt=1757741949621',
-        instructor: 'Harshit Nagar',
-        rating: 4.9, students: 3200, duration: '6 months', modules: 48,
-        price: '₹14,999', originalPrice: '₹29,999',
-        tags: ['AI', 'Full Stack', 'React', 'Node.js', 'Python'],
-        category: 'AI', badge: 'Bestseller', badgeColor: '#f59e0b',
-        features: ['Live sessions', 'Discord community', 'Certificate', 'Job assistance'],
-        level: 'Beginner to Advanced',
-    },
-    {
-        id: 'fullstack-dev',
-        title: 'Full Stack Web Development',
-        subtitle: 'Build production-grade web apps from scratch to deployment',
-        image: 'https://ik.imagekit.io/sheryians/Cohort%202.0/cohort-3_ekZjBiRzc-2_76HU4-Mz5z.jpeg?updatedAt=1757741949621',
-        instructor: 'Sarthak Sharma',
-        rating: 4.8, students: 5100, duration: '4 months', modules: 36,
-        price: '₹9,999', originalPrice: '₹19,999',
-        tags: ['HTML', 'CSS', 'React', 'Node.js', 'MongoDB'],
-        category: 'Web Dev', badge: 'Most Popular', badgeColor: '#3C83F6',
-        features: ['Project-based learning', 'Code reviews', 'Certificate'],
-        level: 'Beginner',
-    },
-    {
-        id: 'dsa-mastery',
-        title: 'Data Structures & Algorithms',
-        subtitle: 'Crack FAANG interviews with structured DSA preparation',
-        image: 'https://ik.imagekit.io/sheryians/Cohort%202.0/cohort-3_ekZjBiRzc-2_76HU4-Mz5z.jpeg?updatedAt=1757741949621',
-        instructor: 'Aryan Mittal',
-        rating: 4.7, students: 2800, duration: '3 months', modules: 28,
-        price: '₹7,999', originalPrice: '₹15,999',
-        tags: ['C++', 'Java', 'Python', 'LeetCode', 'Graphs'],
-        category: 'DSA', badge: 'New', badgeColor: '#22c55e',
-        features: ['500+ problems', 'Mock interviews', 'Certificate'],
-        level: 'Intermediate',
-    },
-    {
-        id: 'devops-cloud',
-        title: 'DevOps & Cloud Engineering',
-        subtitle: 'Docker, Kubernetes, AWS, CI/CD — become production-ready',
-        image: 'https://ik.imagekit.io/sheryians/Cohort%202.0/cohort-3_ekZjBiRzc-2_76HU4-Mz5z.jpeg?updatedAt=1757741949621',
-        instructor: 'Nikhil Rawat',
-        rating: 4.8, students: 1600, duration: '3 months', modules: 24,
-        price: '₹11,999', originalPrice: '₹22,999',
-        tags: ['Docker', 'K8s', 'AWS', 'CI/CD', 'Linux'],
-        category: 'DevOps', badge: 'Hot', badgeColor: '#ef4444',
-        features: ['Cloud projects', 'AWS account setup', 'Certificate'],
-        level: 'Intermediate to Advanced',
-    },
-];
-
-const CATEGORIES = ['All', 'AI', 'Web Dev', 'DSA', 'DevOps'];
+/* ── Category filter list (dynamically built from API) ── */
 
 export default function Courses() {
     const { user, enrollCourse, getEnrolledCourses } = useAuth();
     const navigate = useNavigate();
+
+    const [catalog, setCatalog] = useState([]);
+    const [catalogLoading, setCatalogLoading] = useState(true);
+    const [catalogError, setCatalogError] = useState('');
 
     const [search, setSearch] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
@@ -82,17 +30,32 @@ export default function Courses() {
 
     /* ── enrollment state ── */
     const [enrolledIds, setEnrolledIds] = useState(new Set());
-    const [modal, setModal] = useState(null);        // course object or null
+    const [modal, setModal] = useState(null);
     const [termsChecked, setTermsChecked] = useState(false);
     const [enrolling, setEnrolling] = useState(false);
     const [enrollError, setEnrollError] = useState('');
-    const [justEnrolled, setJustEnrolled] = useState(null); // course id for success flash
+    const [justEnrolled, setJustEnrolled] = useState(null);
 
     const initials = user
         ? `${(user.firstName || '')[0] || ''}${(user.lastName || '')[0] || ''}`.toUpperCase() || 'U'
         : null;
 
-    /* load already-enrolled courses on mount */
+    /* Fetch published courses from the backend */
+    useEffect(() => {
+        setCatalogLoading(true);
+        fetch('http://localhost:5000/api/admin/courses/public')
+            .then(r => r.json())
+            .then(d => {
+                setCatalog(d.courses || []);
+                setCatalogLoading(false);
+            })
+            .catch(() => {
+                setCatalogError('Failed to load courses. Please try again later.');
+                setCatalogLoading(false);
+            });
+    }, []);
+
+    /* Load already-enrolled courses on mount */
     useEffect(() => {
         if (!user) return;
         getEnrolledCourses()
@@ -104,10 +67,13 @@ export default function Courses() {
             .catch(() => { });
     }, [user]);
 
-    const filtered = CATALOG.filter(c => {
+    /* Build category list dynamically from real data */
+    const categories = ['All', ...new Set(catalog.map(c => c.category).filter(Boolean))];
+
+    const filtered = catalog.filter(c => {
         const matchCat = activeCategory === 'All' || c.category === activeCategory;
         const matchSearch = c.title.toLowerCase().includes(search.toLowerCase()) ||
-            c.tags.some(t => t.toLowerCase().includes(search.toLowerCase()));
+            (c.tags || []).some(t => t.toLowerCase().includes(search.toLowerCase()));
         return matchCat && matchSearch;
     });
 
@@ -125,9 +91,10 @@ export default function Courses() {
         setEnrolling(true);
         setEnrollError('');
         try {
-            await enrollCourse(modal.id, modal.title, modal.image);
-            setEnrolledIds(prev => new Set([...prev, modal.id]));
-            setJustEnrolled(modal.id);
+            const courseId = modal._id || modal.id;
+            await enrollCourse(courseId, modal.title, modal.image);
+            setEnrolledIds(prev => new Set([...prev, courseId]));
+            setJustEnrolled(courseId);
             setModal(null);
             /* go to dashboard after a short moment */
             setTimeout(() => navigate('/dashboard'), 1200);
@@ -308,7 +275,7 @@ export default function Courses() {
             {/* ── HERO ── */}
             <div style={{ background: 'linear-gradient(180deg,#0a0a1a 0%,#000 100%)', borderBottom: `1px solid ${C.borderS}`, padding: '56px 24px 48px', textAlign: 'center' }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(60,131,246,0.12)', border: `1px solid rgba(60,131,246,0.3)`, borderRadius: '20px', padding: '5px 14px', fontSize: '12px', fontWeight: 600, color: C.accent, marginBottom: '20px' }}>
-                    <Zap size={13} /> {CATALOG.length} courses available
+                    <Zap size={13} /> {catalog.length} courses available
                 </div>
                 <h1 style={{ fontSize: 'clamp(28px,5vw,52px)', fontWeight: 900, marginBottom: '14px', lineHeight: 1.15 }}>
                     Level up your career with<br />
@@ -334,7 +301,7 @@ export default function Courses() {
                 {/* Category filter */}
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '32px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <Filter size={14} color={C.dim} />
-                    {CATEGORIES.map(cat => (
+                    {categories.map(cat => (
                         <button key={cat} onClick={() => setActiveCategory(cat)} style={{
                             padding: '7px 18px', borderRadius: '20px', border: `1px solid ${activeCategory === cat ? C.accent : C.border}`,
                             background: activeCategory === cat ? 'rgba(60,131,246,0.15)' : 'transparent',
@@ -350,21 +317,30 @@ export default function Courses() {
                 </div>
 
                 {/* Course grid */}
-                {filtered.length === 0 ? (
+                {catalogLoading ? (
                     <div style={{ textAlign: 'center', padding: '80px 20px', color: C.muted }}>
-                        <BookOpen size={48} color={C.dim} style={{ marginBottom: '16px' }} />
-                        <p style={{ fontSize: '18px', fontWeight: 700 }}>No courses found</p>
-                        <p style={{ fontSize: '14px', marginTop: '8px' }}>Try a different search or category.</p>
+                        <p style={{ fontSize: '16px' }}>Loading courses…</p>
+                    </div>
+                ) : catalogError ? (
+                    <div style={{ textAlign: 'center', padding: '80px 20px', color: '#ef4444' }}>
+                        <p style={{ fontSize: '16px' }}>{catalogError}</p>
+                    </div>
+                ) : filtered.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '80px 20px', color: C.muted }}>
+                        <BookOpen size={48} color={C.dim} style={{ marginLeft: '530px', marginBottom: '16px' }} />
+                        <p style={{ fontSize: '18px', fontWeight: 700 }}>{catalog.length === 0 ? 'No courses available yet' : 'No courses found'}</p>
+                        <p style={{ fontSize: '14px', marginTop: '8px' }}>{catalog.length === 0 ? 'Check back soon for new courses.' : 'Try a different search or category.'}</p>
                     </div>
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(520px, 1fr))', gap: '20px' }}>
                         {filtered.map(course => {
-                            const isHovered = hoveredId === course.id;
-                            const enrolled = enrolledIds.has(course.id);
-                            const justDone = justEnrolled === course.id;
+                            const cid = course._id || course.id;
+                            const isHovered = hoveredId === cid;
+                            const enrolled = enrolledIds.has(cid);
+                            const justDone = justEnrolled === cid;
                             return (
-                                <div key={course.id}
-                                    onMouseEnter={() => setHoveredId(course.id)}
+                                <div key={cid}
+                                    onMouseEnter={() => setHoveredId(cid)}
                                     onMouseLeave={() => setHoveredId(null)}
                                     style={{
                                         background: C.surface, borderRadius: '16px',
@@ -415,16 +391,16 @@ export default function Courses() {
                                         {/* Stats */}
                                         <div style={{ display: 'flex', gap: '16px', marginBottom: '14px' }}>
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: C.muted }}>
-                                                <Star size={12} color="#f59e0b" fill="#f59e0b" /> <b style={{ color: '#f59e0b' }}>{course.rating}</b>
+                                                <Star size={12} color="#f59e0b" fill="#f59e0b" /> <b style={{ color: '#f59e0b' }}>{course.rating ?? 0}</b>
                                             </span>
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: C.muted }}>
-                                                <Users size={12} color={C.dim} /> {course.students.toLocaleString()} students
+                                                <Users size={12} color={C.dim} /> {(course.students ?? 0).toLocaleString()} students
                                             </span>
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: C.muted }}>
-                                                <Clock size={12} color={C.dim} /> {course.duration}
+                                                <Clock size={12} color={C.dim} /> {course.duration || '—'}
                                             </span>
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: C.muted }}>
-                                                <BookOpen size={12} color={C.dim} /> {course.modules} modules
+                                                <BookOpen size={12} color={C.dim} /> {course.modules ?? 0} modules
                                             </span>
                                         </div>
 

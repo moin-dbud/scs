@@ -1,13 +1,17 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext';
+import { PlatformProvider } from './context/PlatformStore';
 import AdminLayout from './components/AdminLayout';
+import Toast from './components/Toast';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
 import AdminCourses from './pages/AdminCourses';
 import AdminEnrollments from './pages/AdminEnrollments';
+import AdminAnnouncements from './pages/AdminAnnouncements';
 import AdminSettings from './pages/AdminSettings';
+import AdminCourseModules from './pages/AdminCourseModules';
 
 /* ── Full-page loader while session resolves ── */
 function Loader() {
@@ -18,7 +22,7 @@ function Loader() {
       fontFamily: 'Outfit, sans-serif',
     }}>
       <div style={{ width: '36px', height: '36px', borderRadius: '50%', border: '3px solid rgba(239,68,68,0.2)', borderTopColor: '#ef4444', animation: 'spin 0.75s linear infinite' }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes fadeIn { from{opacity:0} to{opacity:1} }`}</style>
       <p style={{ color: '#555', fontSize: '13px' }}>Verifying access…</p>
     </div>
   );
@@ -29,7 +33,12 @@ function PrivateAdminRoute({ children }) {
   const { admin, loading } = useAdminAuth();
   if (loading) return <Loader />;
   if (!admin) return <Navigate to="/login" replace />;
-  return <AdminLayout>{children}</AdminLayout>;
+  return (
+    <AdminLayout>
+      {children}
+      <Toast />
+    </AdminLayout>
+  );
 }
 
 /* ── Guest guard: already logged-in admins go to dashboard ── */
@@ -43,7 +52,7 @@ function GuestAdminRoute({ children }) {
 function AdminApp() {
   return (
     <Routes>
-      {/* Login — redirect to / if already authenticated */}
+      {/* Login */}
       <Route path="/login" element={<GuestAdminRoute><AdminLogin /></GuestAdminRoute>} />
 
       {/* Protected admin routes */}
@@ -51,6 +60,8 @@ function AdminApp() {
       <Route path="/users" element={<PrivateAdminRoute><AdminUsers /></PrivateAdminRoute>} />
       <Route path="/courses" element={<PrivateAdminRoute><AdminCourses /></PrivateAdminRoute>} />
       <Route path="/enrollments" element={<PrivateAdminRoute><AdminEnrollments /></PrivateAdminRoute>} />
+      <Route path="/announcements" element={<PrivateAdminRoute><AdminAnnouncements /></PrivateAdminRoute>} />
+      <Route path="/course-modules" element={<PrivateAdminRoute><AdminCourseModules /></PrivateAdminRoute>} />
       <Route path="/settings" element={<PrivateAdminRoute><AdminSettings /></PrivateAdminRoute>} />
 
       {/* Catch-all */}
@@ -62,7 +73,9 @@ function AdminApp() {
 export default function App() {
   return (
     <AdminAuthProvider>
-      <AdminApp />
+      <PlatformProvider>
+        <AdminApp />
+      </PlatformProvider>
     </AdminAuthProvider>
   );
 }

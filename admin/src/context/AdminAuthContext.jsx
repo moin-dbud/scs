@@ -15,7 +15,6 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 /* ── ADMIN WHITELIST ─────────────────────────────────────────────────────── */
 const ADMIN_WHITELIST = [
     'hello@moinsheikh.in',
-    // add more admin emails here when needed
 ];
 
 const API = 'http://localhost:5000/api';
